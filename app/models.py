@@ -92,9 +92,15 @@ class User(UserMixin, db.Model):
         Follower = so.aliased(User)
         return (
             sa.select(Post)
-            .join(Post.Author.of_type(Author))
-            .join(Author.followers.of_type(Follower))
-            .where(Follower.id == self.id)
+            .join(Post.author.of_type(Author))
+            .join(Author.followers.of_type(Follower), isouter=True)
+            .where(
+                sa.or_(
+                    Follower.id == self.id,
+                    Author.id == self.id,
+                )
+            )
+            .group_by(Post)
             .order_by(Post.timestamp.desc())
         )
 
