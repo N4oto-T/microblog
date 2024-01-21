@@ -62,6 +62,31 @@ class User(UserMixin, db.Model):
         digest = md5(self.email.lower().encode("utf-8")).hexdigest()
         return f"https://www.gravatar.com/avatar/{digest}?d=identicon&s={size}"
 
+    def follow(self, user):
+        if not self.is_following(user):
+            self.following.add(user)
+
+    def unfollow(self, user):
+        if self.is_following(user):
+            self.following.remove(user)
+
+    def is_following(self, user):
+        # WriteOnlyのrelationshipはselect()メソッドを持っている。これはrelationの全ての要素を返す。その後、whereで絞り込みしてる。
+        query = self.following.select().where(User.id == user.id)
+        return db.session.scalar(query) is not None
+
+    def followers_count(self):
+        query = sa.select(sa.func.count()).select_from(
+            self.followers.select().subquery()
+        )
+        return db.session.scalar(query)
+
+    def following_count(self):
+        query = sa.select(sa.func.count()).select_from(
+            self.following.select().subquery()
+        )
+        return db.session.scalar(query)
+
     def __repr__(self) -> str:
         return f"<User {self.username}>"
 
