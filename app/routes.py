@@ -6,8 +6,8 @@ from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app import app, db
-from app.forms import EditProfileForm, EmptyForm, LoginForm, RegistrationForm
-from app.models import User
+from app.forms import EditProfileForm, EmptyForm, LoginForm, PostForm, RegistrationForm
+from app.models import Post, User
 
 
 # どのview funcが呼ばれた場合にも、事前に実行されるメソッド
@@ -22,12 +22,16 @@ def before_request():
 @app.route("/index")
 @login_required
 def index():
-    user = {"username": "Miguel"}
-    posts = [
-        {"author": {"username": "John"}, "body": "Beautiful day in Portland!"},
-        {"author": {"username": "Susan"}, "body": "The Avengers movie was so cool!"},
-    ]
-    return render_template("index.html", title="Home", posts=posts)
+    form = PostForm()
+    if form.validate_on_submit():
+        post = Post(body=form.post.data, author=current_user)
+        db.session.add(post)
+        db.session.commit()
+        flash("Your post is now live")
+        return redirect(url_for("index"))
+    posts = db.session.scalars(current_user.following_posts()).all()
+
+    return render_template("index.html", title="Home", posts=posts, form=form)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -144,3 +148,12 @@ def unfollow(username):
         return redirect(url_for("user", username=username))
     else:
         return redirect(url_for("index"))
+
+
+@app.route("/explore")
+@login_required
+def explore():
+    query = sa.select(Post).order_by(Post.timestamp.desc())
+    posts = db.session.scalars(query).all()
+    # exploreとindexページは似た構造になるのでindexを再利用する。しかし、blogを書くformは表示させたくないのでform引数はなし。
+    return render_template("index.html", title="Explore", posts=posts)
