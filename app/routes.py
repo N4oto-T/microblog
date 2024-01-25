@@ -6,7 +6,15 @@ from flask import flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app import app, db
-from app.forms import EditProfileForm, EmptyForm, LoginForm, PostForm, RegistrationForm
+from app.email import send_password_reset_email
+from app.forms import (
+    EditProfileForm,
+    EmptyForm,
+    LoginForm,
+    PostForm,
+    RegistrationForm,
+    ResetPasswordRequestForm,
+)
 from app.models import Post, User
 
 
@@ -49,8 +57,6 @@ def index():
         next_url=next_url,
         prev_url=prev_url,
     )
-
-    return render_template("index.html", title="Home", posts=posts.items, form=form)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -206,4 +212,20 @@ def explore():
         posts=posts.items,
         next_url=next_url,
         prev_url=prev_url,
+    )
+
+
+@app.route("/reset_password_request", method=["GET", "POST"])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for("index"))
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = db.session.scalar(sa.select(User).where(User.email == form.email.data))
+        if user:
+            send_password_reset_email(user)
+        flash("Check your email for the instructions to reset your password")
+        return redirect(url_for("login"))
+    return render_template(
+        "reset_password_request.html", title="Reset Password", form=form
     )
